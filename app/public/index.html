@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f4ef">
+  <meta name="color-scheme" content="light">
+  <title>Habits</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div>
+        <p class="eyebrow" id="range"></p>
+        <h1 id="title">Today</h1>
+      </div>
+      <div class="weeknav" id="weeknav">
+        <button id="prev" aria-label="Previous week">‹</button>
+        <button id="today">Today</button>
+        <button id="next" aria-label="Next week">›</button>
+      </div>
+    </header>
+
+    <div class="notice" id="notice" hidden></div>
+
+    <!-- Dashboard: check in only -->
+    <div class="tab" id="tab-dashboard">
+      <nav class="strip" id="strip" aria-label="Pick a day"></nav>
+
+      <section class="hero card">
+        <div class="hero-row">
+          <div>
+            <p class="label" id="heroLabel"></p>
+            <p class="sub" id="heroSub"></p>
+          </div>
+          <p class="big"><span id="heroPct">0</span><small>%</small></p>
+        </div>
+        <div class="bar"><i id="heroBar"></i></div>
+      </section>
+
+      <section class="list card" id="list" aria-label="Habits for the selected day"></section>
+    </div>
+
+    <!-- Control: add and remove habits -->
+    <div class="tab" id="tab-control" hidden>
+      <form class="add card" id="add">
+        <input id="name" placeholder="New habit" maxlength="60" autocomplete="off" aria-label="Habit name">
+        <button type="submit">Add</button>
+      </form>
+      <section class="list card" id="manage" aria-label="Manage habits"></section>
+      <button id="server" class="server" hidden>⚙︎ Server</button>
+    </div>
+
+    <!-- Overall: weekly and daily progress -->
+    <div class="tab" id="tab-overall" hidden>
+      <div class="seg" role="tablist">
+        <button id="seg-weekly" class="on" role="tab">Weekly</button>
+        <button id="seg-daily" role="tab">Daily</button>
+      </div>
+
+      <section class="hero card">
+        <div class="hero-row">
+          <div>
+            <p class="label" id="ovLabel"></p>
+            <p class="sub" id="ovSub"></p>
+          </div>
+          <p class="big"><span id="ovPct">0</span><small>%</small></p>
+        </div>
+        <div class="bar"><i id="ovBar"></i></div>
+      </section>
+
+      <section class="card panel">
+        <div class="panel-head"><h2 id="chartTitle"></h2></div>
+        <div class="chart" id="chart" aria-label="Progress chart"></div>
+      </section>
+
+      <section class="card panel">
+        <div class="panel-head"><h2 id="detailTitle"></h2></div>
+        <div id="detail"></div>
+      </section>
+    </div>
+  </main>
+
+  <nav class="tabbar" id="tabbar" aria-label="Sections">
+    <span class="glide" id="glide" aria-hidden="true"></span>
+    <button data-tab="dashboard" class="on">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button data-tab="control">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      <span>Control</span>
+    </button>
+    <button data-tab="overall">
+      <svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
+      <span>Overall</span>
+    </button>
+  </nav>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

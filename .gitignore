@@ -1,0 +1,12 @@
+node_modules
+.env
+.vercel
+.data
+app/android/build
+app/android/app/build
+app/android/.gradle
+app/android/local.properties
+app/android/capacitor-cordova-android-plugins/build
+*.apk
+.DS_Store
+.claude

@@ -1,0 +1,6 @@
+{
+  "appId": "com.deepak.habittracker",
+  "appName": "Habits",
+  "webDir": "public",
+  "server": { "androidScheme": "http", "cleartext": true }
+}
