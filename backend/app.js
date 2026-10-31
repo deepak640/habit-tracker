@@ -113,7 +113,8 @@ app.put(
 
 // ---- Diet chat (Gemini) ----
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Tried in order; the next one is used when a model is overloaded (503), missing (404) or slow.
+const GEMINI_MODELS = (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.6-flash').split(',');
 const DIET_CONTEXT = 30; // most recent messages sent to Gemini
 const DIET_PROMPT =
   'You are a friendly nutrition coach inside a habit tracker app. The user tells you what they ate or asks about food. ' +
@@ -140,16 +141,28 @@ app.post(
     const recent = (await DietMessage.find().sort({ createdAt: -1 }).limit(DIET_CONTEXT)).reverse();
     const today = String(req.body.date || '').match(DATE_RE) ? req.body.date : isoDay(new Date());
 
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: `${DIET_PROMPT} Today's date is ${today}; restart the daily total each new day.` }] },
-        contents: recent.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
-      }),
+    const body = JSON.stringify({
+      systemInstruction: { parts: [{ text: `${DIET_PROMPT} Today's date is ${today}; restart the daily total each new day.` }] },
+      contents: recent.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
     });
-    if (!r.ok) {
-      console.error('Gemini error', r.status, await r.text());
+    let r;
+    for (const model of GEMINI_MODELS) {
+      try {
+        r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+          body,
+          signal: AbortSignal.timeout(9000),
+        });
+      } catch (err) {
+        console.error('Gemini', model, err.name);
+        r = null;
+        continue;
+      }
+      if (r.ok) break;
+      console.error('Gemini', model, r.status, await r.text());
+    }
+    if (!r?.ok) {
       await DietMessage.findByIdAndDelete(user._id); // keep history free of unanswered messages
       return res.status(502).json({ error: 'gemini request failed' });
     }

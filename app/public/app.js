@@ -257,6 +257,7 @@ $('add').onsubmit = async (e) => {
 
 /* ---------- Diet ---------- */
 
+const DIET_INTRO = 'Hey, I\'m your diet planner! I\'m here to help you track your calories and protein. Tell me what you ate, e.g. "2 eggs and a slice of toast", or ask what to eat next.';
 let dietLoaded = false;
 let dietBusy = false;
 
@@ -277,7 +278,7 @@ async function loadDiet() {
     dietLoaded = true;
     const chat = $('chat');
     chat.innerHTML = '';
-    if (!msgs.length) chat.append(Object.assign(el('div', 'empty'), { textContent: 'Tell me what you ate, e.g. "2 eggs and a slice of toast".' }));
+    if (!msgs.length) addBubble('model', DIET_INTRO);
     msgs.forEach((m) => addBubble(m.role, m.text));
   } catch (e) {
     console.error(e);
