@@ -15,6 +15,7 @@ const HISTORY_WEEKS = 8;
 
 let weekStart = mondayOf(new Date());
 let selected = iso(new Date());
+const TABS = ['dashboard', 'control', 'diet', 'overall'];
 let tab = 'dashboard';
 let view = 'weekly';
 let habits = [];
@@ -118,14 +119,14 @@ function render() {
   const dates = weekDates();
   const todayIso = iso(new Date());
 
-  for (const t of ['dashboard', 'control', 'overall']) $('tab-' + t).hidden = t !== tab;
+  for (const t of TABS) $('tab-' + t).hidden = t !== tab;
   document.querySelectorAll('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   positionGlide();
-  $('weeknav').hidden = tab === 'control';
+  $('weeknav').hidden = tab === 'control' || tab === 'diet';
   $('range').textContent =
-    tab === 'control' ? `${habits.length} habit${habits.length === 1 ? '' : 's'}` : `${short(dates[0])} – ${short(dates[6])}`;
+    tab === 'control' ? `${habits.length} habit${habits.length === 1 ? '' : 's'}` : tab === 'diet' ? 'Calories & protein' : `${short(dates[0])} – ${short(dates[6])}`;
   $('title').textContent =
-    tab === 'control' ? 'Control' : tab === 'overall' ? 'Overall' : selected === todayIso ? 'Today' : fmt(new Date(selected + 'T00:00'), { weekday: 'long' });
+    tab === 'control' ? 'Control' : tab === 'diet' ? 'Diet' : tab === 'overall' ? 'Overall' : selected === todayIso ? 'Today' : fmt(new Date(selected + 'T00:00'), { weekday: 'long' });
 
   if (tab === 'dashboard') {
     renderStrip(dates, todayIso);
@@ -133,6 +134,8 @@ function render() {
     renderList(todayIso);
   } else if (tab === 'control') {
     renderControl();
+  } else if (tab === 'diet') {
+    loadDiet();
   } else {
     renderOverall(dates, todayIso);
   }
@@ -214,17 +217,22 @@ function renderControl() {
     row.style.setProperty('--c', color(i)[0]);
     row.innerHTML = '<span class="sw"></span><span class="name"></span><button class="rm">Remove</button>';
     row.querySelector('.name').textContent = h.name;
-    row.querySelector('.rm').onclick = () => removeHabit(h);
+    row.querySelector('.rm').onclick = () => removeHabit(h, row);
     box.append(row);
   });
 }
 
-async function removeHabit(h) {
+async function removeHabit(h, row) {
   if (!confirm(`Remove "${h.name}" and its history?`)) return;
+  row.style.height = row.offsetHeight + 'px';
+  void row.offsetHeight; // commit the explicit height so it can transition to 0
+  row.classList.add('leaving');
   try {
-    await api(`/api/habits/${h._id}`, { method: 'DELETE' });
+    await Promise.all([api(`/api/habits/${h._id}`, { method: 'DELETE' }), new Promise((r) => setTimeout(r, 280))]);
   } catch (e) {
     console.error(e);
+    row.classList.remove('leaving');
+    row.style.height = '';
     showError("Couldn't remove the habit — server not reachable.");
     return;
   }
@@ -243,7 +251,63 @@ $('add').onsubmit = async (e) => {
     return;
   }
   $('name').value = '';
-  load();
+  await load();
+  $('manage').lastElementChild?.classList.add('enter');
+};
+
+/* ---------- Diet ---------- */
+
+let dietLoaded = false;
+let dietBusy = false;
+
+function addBubble(role, text) {
+  const chat = $('chat');
+  chat.querySelector('.empty')?.remove();
+  const b = el('div', 'msg ' + (role === 'user' ? 'me' : 'ai'));
+  b.textContent = text;
+  chat.append(b);
+  chat.scrollTop = chat.scrollHeight;
+  return b;
+}
+
+async function loadDiet() {
+  if (dietLoaded) return;
+  try {
+    const msgs = await api('/api/diet');
+    dietLoaded = true;
+    const chat = $('chat');
+    chat.innerHTML = '';
+    if (!msgs.length) chat.append(Object.assign(el('div', 'empty'), { textContent: 'Tell me what you ate, e.g. "2 eggs and a slice of toast".' }));
+    msgs.forEach((m) => addBubble(m.role, m.text));
+  } catch (e) {
+    console.error(e);
+    showError("Can't load the diet chat — server not reachable.");
+  }
+}
+
+$('dietForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $('dietText').value.trim();
+  if (!text || dietBusy) return;
+  dietBusy = true;
+  $('dietSend').disabled = true;
+  $('dietText').value = '';
+  addBubble('user', text);
+  const typing = addBubble('model', '…');
+  typing.classList.add('typing');
+  try {
+    const { model } = await api('/api/diet', { method: 'POST', body: { text, date: iso(new Date()) } });
+    typing.classList.remove('typing');
+    typing.textContent = model.text;
+  } catch (err) {
+    console.error(err);
+    typing.remove();
+    $('dietText').value = text;
+    showError("Couldn't get a reply — check the server and GEMINI_API_KEY.");
+  }
+  $('chat').scrollTop = $('chat').scrollHeight;
+  dietBusy = false;
+  $('dietSend').disabled = false;
 };
 
 /* ---------- Overall ---------- */
@@ -275,10 +339,11 @@ function renderOverall(dates, todayIso) {
     $('ovBar').style.width = pct + '%';
 
     $('chartTitle').textContent = `Last ${HISTORY_WEEKS} weeks`;
+    $('chartHint').textContent = 'Each bar is one week. Taller bar means more habits done.';
     bars(
       Array.from({ length: HISTORY_WEEKS }, (_, k) => {
         const start = addDays(weekStart, -7 * (HISTORY_WEEKS - 1 - k));
-        return { pct: weekPct(start), label: fmt(start, { month: 'numeric', day: 'numeric' }), sel: k === HISTORY_WEEKS - 1 };
+        return { pct: weekPct(start), label: k === HISTORY_WEEKS - 1 ? 'This\nweek' : fmt(start, { month: 'short' }) + '\n' + start.getDate(), sel: k === HISTORY_WEEKS - 1 };
       }),
       false
     );
@@ -304,6 +369,7 @@ function renderOverall(dates, todayIso) {
     // 14 days ending today (or the last day of the viewed week if it is in the past).
     const end = dateStrs[6] < todayIso ? dates[6] : new Date(todayIso + 'T00:00');
     $('chartTitle').textContent = 'Last 14 days';
+    $('chartHint').textContent = 'Each bar is one day. Dark bar is today.';
     bars(
       Array.from({ length: 14 }, (_, k) => {
         const d = addDays(end, -(13 - k));
@@ -340,7 +406,6 @@ function renderOverall(dates, todayIso) {
 
 /* ---------- Wiring ---------- */
 
-const TABS = ['dashboard', 'control', 'overall'];
 
 // Replay the entrance animation on the visible tab: slide in from the side we came from.
 function animateTab(dx) {
@@ -369,7 +434,7 @@ document.querySelectorAll('#tabbar button').forEach((b) => {
     if (next === tab) return;
     const dx = (TABS.indexOf(next) - TABS.indexOf(tab)) * 28;
     tab = next;
-    window.scrollTo(0, 0);
+    document.querySelector('.app').scrollTop = 0;
     render();
     animateTab(dx);
   };
@@ -406,3 +471,16 @@ if (isNative) {
 }
 
 load();
+
+// Greeting splash: shows once per launch, tap to skip.
+(() => {
+  const splash = $('splash');
+  const hour = new Date().getHours();
+  $('greet').textContent = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const hide = () => {
+    splash.classList.add('out');
+    setTimeout(() => splash.remove(), 700);
+  };
+  splash.onclick = hide;
+  setTimeout(hide, 2400);
+})();

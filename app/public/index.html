@@ -9,6 +9,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="splash" id="splash" aria-hidden="true">
+    <div class="splash-in">
+      <svg class="splash-mark" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20"/><path d="M15 25l6 6 12-14"/></svg>
+      <h2 id="greet">Good morning</h2>
+      <p>Track your habits</p>
+    </div>
+  </div>
+
   <main class="app">
     <header class="top">
       <div>
@@ -52,6 +60,15 @@
       <button id="server" class="server" hidden>⚙︎ Server</button>
     </div>
 
+    <!-- Diet: chat with Gemini about calories and protein -->
+    <div class="tab" id="tab-diet" hidden>
+      <section class="chat card" id="chat" aria-live="polite"></section>
+      <form class="add card" id="dietForm">
+        <input id="dietText" placeholder="What did you eat?" maxlength="2000" autocomplete="off" aria-label="Message">
+        <button type="submit" id="dietSend">Send</button>
+      </form>
+    </div>
+
     <!-- Overall: weekly and daily progress -->
     <div class="tab" id="tab-overall" hidden>
       <div class="seg" role="tablist">
@@ -71,7 +88,7 @@
       </section>
 
       <section class="card panel">
-        <div class="panel-head"><h2 id="chartTitle"></h2></div>
+        <div class="panel-head"><h2 id="chartTitle"></h2><p class="sub" id="chartHint"></p></div>
         <div class="chart" id="chart" aria-label="Progress chart"></div>
       </section>
 
@@ -91,6 +108,10 @@
     <button data-tab="control">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
       <span>Control</span>
+    </button>
+    <button data-tab="diet">
+      <svg viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>
+      <span>Diet</span>
     </button>
     <button data-tab="overall">
       <svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>

@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Habit = require('./models/Habit');
 const Log = require('./models/Log');
+const DietMessage = require('./models/DietMessage');
 const { connect } = require('./db');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -107,6 +108,67 @@ app.put(
     if (done) await Log.updateOne({ habit, date }, { habit, date }, { upsert: true });
     else await Log.deleteOne({ habit, date });
     res.json({ habit, date, done: !!done });
+  })
+);
+
+// ---- Diet chat (Gemini) ----
+
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const DIET_CONTEXT = 30; // most recent messages sent to Gemini
+const DIET_PROMPT =
+  'You are a friendly nutrition coach inside a habit tracker app. The user tells you what they ate or asks about food. ' +
+  'Estimate calories and protein (grams) for each item, then give the running total for the day so far. ' +
+  'Keep replies short and phone-friendly, plain text with simple lists, no markdown tables. ' +
+  'If a portion is unclear, assume a typical serving and say so. Do not give medical advice.';
+
+app.get(
+  '/api/diet',
+  wrap(async (req, res) => {
+    const msgs = await DietMessage.find().sort({ createdAt: -1 }).limit(100);
+    res.json(msgs.reverse().map((m) => ({ _id: m._id, role: m.role, text: m.text, createdAt: m.createdAt })));
+  })
+);
+
+app.post(
+  '/api/diet',
+  wrap(async (req, res) => {
+    const text = String(req.body.text || '').trim().slice(0, 2000);
+    if (!text) return res.status(400).json({ error: 'text is required' });
+    if (!process.env.GEMINI_API_KEY) return res.status(503).json({ error: 'GEMINI_API_KEY is not set' });
+
+    const user = await DietMessage.create({ role: 'user', text });
+    const recent = (await DietMessage.find().sort({ createdAt: -1 }).limit(DIET_CONTEXT)).reverse();
+    const today = String(req.body.date || '').match(DATE_RE) ? req.body.date : isoDay(new Date());
+
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: `${DIET_PROMPT} Today's date is ${today}; restart the daily total each new day.` }] },
+        contents: recent.map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
+      }),
+    });
+    if (!r.ok) {
+      console.error('Gemini error', r.status, await r.text());
+      await DietMessage.findByIdAndDelete(user._id); // keep history free of unanswered messages
+      return res.status(502).json({ error: 'gemini request failed' });
+    }
+    const data = await r.json();
+    const reply = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('').trim();
+    if (!reply) {
+      await DietMessage.findByIdAndDelete(user._id);
+      return res.status(502).json({ error: 'empty reply from gemini' });
+    }
+    const model = await DietMessage.create({ role: 'model', text: reply });
+    res.status(201).json({ user, model });
+  })
+);
+
+app.delete(
+  '/api/diet',
+  wrap(async (req, res) => {
+    await DietMessage.deleteMany({});
+    res.status(204).end();
   })
 );
 
