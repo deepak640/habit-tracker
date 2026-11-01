@@ -99,6 +99,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 /* Dashboard: header, week strip and hero stay put; only the habit list scrolls */
 #tab-dashboard { grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
 #tab-control { grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+#tab-control.has-remind { grid-template-rows: auto auto minmax(0, 1fr); }
 #tab-diet { grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
 #tab-dashboard .list, #tab-control .list { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; align-self: start; max-height: 100%; }
 .tab[hidden] { display: none; }
@@ -259,9 +260,13 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .remind { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
 .remind > div { flex: 1; min-width: 0; }
 .remind b { display: block; font-size: 16px; }
-.remind small { font-size: 12px; color: var(--muted); }
-.remind input { font: inherit; font-weight: 600; color: inherit; background: var(--track); border: 0; border-radius: 12px; padding: 6px 10px; outline: 0; }
-.remind input:disabled { opacity: 0.4; }
+.remind select {
+  flex: none; font: inherit; font-weight: 600; color: inherit; border: 0; border-radius: 12px; outline: 0;
+  appearance: none; -webkit-appearance: none;
+  padding: 8px 34px 8px 14px;
+  background: var(--track) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%238a8f9c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 12px center;
+}
+.remind select:disabled { opacity: 0.4; }
 .switch { flex: none; width: 50px; height: 30px; padding: 3px; border-radius: 999px; background: var(--track); transition: background 0.2s var(--ease); }
 .switch i { display: block; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.2s var(--ease); }
 .switch[aria-checked="true"] { background: #34c759; }

@@ -522,19 +522,20 @@ load();
   const Push = window.Capacitor?.Plugins?.PushNotifications;
   if (!Push || window.Capacitor.getPlatform() !== 'android') return; // no plugin in a plain browser
   $('remind').hidden = false;
+  $('tab-control').classList.add('has-remind');
 
   const KEY = 'reminder';
   const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
-  const state = { on: !!saved.on, time: saved.time || '21:00', token: saved.token || '' };
+  const state = { on: !!saved.on, every: saved.every || 3, token: saved.token || '' };
   const persist = () => localStorage.setItem(KEY, JSON.stringify(state));
   const paint = () => {
     $('remindOn').setAttribute('aria-checked', state.on);
-    $('remindTime').value = state.time;
-    $('remindTime').disabled = !state.on;
+    $('remindEvery').value = state.every;
+    $('remindEvery').disabled = !state.on;
   };
   const sync = () =>
     state.token &&
-    api('/api/push', { method: 'PUT', body: { token: state.token, enabled: state.on, time: state.time, tzOffset: new Date().getTimezoneOffset() } }).catch((e) => {
+    api('/api/push', { method: 'PUT', body: { token: state.token, enabled: state.on, everyHours: state.every, tzOffset: new Date().getTimezoneOffset() } }).catch((e) => {
       console.error(e);
       showError("Couldn't save the reminder — server not reachable.");
     });
@@ -571,9 +572,10 @@ load();
     paint();
     sync();
   };
-  $('remindTime').onchange = (e) => {
-    state.time = e.target.value || '21:00';
+  $('remindEvery').onchange = (e) => {
+    state.every = Number(e.target.value) || 3;
     persist();
+    paint();
     sync();
   };
 

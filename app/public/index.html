@@ -62,8 +62,14 @@
         <button type="submit">Add</button>
       </form>
       <section class="remind card" id="remind" hidden>
-        <div><b>Daily reminder</b><small id="remindSub">Push notification to check your habits</small></div>
-        <input type="time" id="remindTime" value="21:00" aria-label="Reminder time">
+        <div><b>Reminder</b></div>
+        <select id="remindEvery" aria-label="Reminder repeat">
+          <option value="1">Every hour</option>
+          <option value="2">Every 2 hours</option>
+          <option value="3">Every 3 hours</option>
+          <option value="4">Every 4 hours</option>
+          <option value="6">Every 6 hours</option>
+        </select>
         <button type="button" class="switch" id="remindOn" role="switch" aria-checked="false" aria-label="Reminder on"><i></i></button>
       </section>
       <section class="list card" id="manage" aria-label="Manage habits"></section>

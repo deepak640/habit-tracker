@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 
-// One phone registered for the daily habit reminder (FCM token + chosen time).
+// One phone registered for habit reminders (FCM token + chosen interval).
 const pushDeviceSchema = new mongoose.Schema(
   {
     token: { type: String, required: true, unique: true },
     enabled: { type: Boolean, default: true },
-    time: { type: String, default: '21:00', match: /^\d{2}:\d{2}$/ }, // local HH:MM
     tzOffset: { type: Number, default: 0 }, // minutes, same sign as Date#getTimezoneOffset (UTC - local)
-    lastSent: { type: String, default: '' }, // local day (YYYY-MM-DD) of the last reminder
+    everyHours: { type: Number, default: 3 }, // reminder every N hours between 08:00 and 22:00 local
+    lastSentAt: { type: Date }, // last interval reminder
   },
   { timestamps: true }
 );

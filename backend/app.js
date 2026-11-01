@@ -189,8 +189,6 @@ app.delete(
 
 // ---------- Push reminders ----------
 
-const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
-
 // Phone registers (or updates) its FCM token, reminder time and on/off state.
 app.put(
   '/api/push',
@@ -198,15 +196,15 @@ app.put(
     const token = String(req.body.token || '').trim();
     if (!token) return res.status(400).json({ error: 'token is required' });
     const set = { enabled: req.body.enabled !== false };
-    if (TIME_RE.test(req.body.time)) set.time = req.body.time;
     if (Number.isFinite(req.body.tzOffset)) set.tzOffset = req.body.tzOffset;
+    if ([1, 2, 3, 4, 6].includes(req.body.everyHours)) set.everyHours = req.body.everyHours;
     await PushDevice.findOneAndUpdate({ token }, { $set: set }, { upsert: true });
     res.status(204).end();
   })
 );
 
 // Hit this every minute from an external cron (cron-job.org etc.) with ?key=CRON_SECRET.
-// A device is due once its local clock passes its reminder time and it has not been sent today.
+// A device is due every `everyHours` hours between 08:00 and 22:00 local, unless all habits are done.
 app.get(
   '/api/push/cron',
   wrap(async (req, res) => {
@@ -226,17 +224,17 @@ app.get(
     for (const d of await PushDevice.find({ enabled: true })) {
       const local = new Date(now - d.tzOffset * 60000).toISOString(); // shifted clock, read as UTC
       const day = local.slice(0, 10);
-      if (d.lastSent === day || local.slice(11, 16) < d.time) continue;
+      const hour = Number(local.slice(11, 13));
+      if (hour < 8 || hour >= 22) continue; // quiet hours
+      if (d.lastSentAt && now - d.lastSentAt.getTime() < d.everyHours * 3600000 - 30000) continue;
 
       const done = await Log.countDocuments({ date: day });
       const left = Math.max(habitCount - done, 0);
-      const notification =
-        habitCount && !left
-          ? { title: 'All done today 🎉', body: 'Every habit checked off. Nice work!' }
-          : { title: 'Habit check-in', body: left ? `${left} habit${left === 1 ? '' : 's'} left today. You got this!` : 'Time to check your habits.' };
+      if (habitCount && !left) continue; // nothing to nag about
+      const notification = { title: 'Keep it up 💪', body: `You have only ${left} habit${left === 1 ? '' : 's'} left today.` };
       try {
         await fcm.send({ token: d.token, notification, android: { priority: 'high' } });
-        d.lastSent = day;
+        d.lastSentAt = new Date(now);
         await d.save();
         sent++;
       } catch (err) {
