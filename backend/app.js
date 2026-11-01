@@ -211,7 +211,13 @@ app.get(
   '/api/push/cron',
   wrap(async (req, res) => {
     if (!process.env.CRON_SECRET || req.query.key !== process.env.CRON_SECRET) return res.status(401).json({ error: 'unauthorized' });
-    const fcm = messaging();
+    let fcm;
+    try {
+      fcm = messaging();
+    } catch (err) {
+      console.error('Firebase init', err.message);
+      return res.status(500).json({ error: 'firebase init failed: ' + err.message.slice(0, 120) });
+    }
     if (!fcm) return res.status(503).json({ error: 'FIREBASE_SERVICE_ACCOUNT is not set' });
 
     const now = Date.now();
