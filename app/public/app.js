@@ -123,8 +123,6 @@ function render() {
   document.querySelectorAll('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   positionGlide();
   $('weeknav').hidden = tab === 'control' || tab === 'diet';
-  $('range').textContent =
-    tab === 'control' ? `${habits.length} habit${habits.length === 1 ? '' : 's'}` : tab === 'diet' ? 'Calories & protein' : `${short(dates[0])} – ${short(dates[6])}`;
   $('title').textContent =
     tab === 'control' ? 'Control' : tab === 'diet' ? 'Diet' : tab === 'overall' ? 'Overall' : selected === todayIso ? 'Today' : fmt(new Date(selected + 'T00:00'), { weekday: 'long' });
 
@@ -294,8 +292,9 @@ $('dietForm').onsubmit = async (e) => {
   $('dietSend').disabled = true;
   $('dietText').value = '';
   addBubble('user', text);
-  const typing = addBubble('model', '…');
+  const typing = addBubble('model', '');
   typing.classList.add('typing');
+  typing.innerHTML = '<i></i><i></i><i></i>';
   try {
     const { model } = await api('/api/diet', { method: 'POST', body: { text, date: iso(new Date()) } });
     typing.classList.remove('typing');
@@ -309,6 +308,26 @@ $('dietForm').onsubmit = async (e) => {
   $('chat').scrollTop = $('chat').scrollHeight;
   dietBusy = false;
   $('dietSend').disabled = false;
+};
+
+$('dietClear').onclick = async () => {
+  if (dietBusy || !confirm('Clear the whole diet chat and start fresh?')) return;
+  dietBusy = true;
+  $('dietClear').disabled = true;
+  try {
+    await api('/api/diet', { method: 'DELETE' });
+    const chat = $('chat');
+    chat.classList.add('clearing');
+    await new Promise((r) => setTimeout(r, 260));
+    chat.classList.remove('clearing');
+    chat.innerHTML = '';
+    addBubble('model', DIET_INTRO);
+  } catch (err) {
+    console.error(err);
+    showError("Couldn't clear the chat — server not reachable.");
+  }
+  dietBusy = false;
+  $('dietClear').disabled = false;
 };
 
 /* ---------- Overall ---------- */
@@ -473,15 +492,91 @@ if (isNative) {
 
 load();
 
-// Greeting splash: shows once per launch, tap to skip.
+// Opening animation: comet falls from the sky into the logo, greeting rains in. Tap to skip.
 (() => {
   const splash = $('splash');
   const hour = new Date().getHours();
-  $('greet').textContent = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const greeting = hour < 5 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  splash.style.setProperty('--horizon', hour < 5 || hour >= 20 ? '#1b2a6b' : hour < 12 ? '#1f6f7a' : hour < 17 ? '#16508f' : '#7a3b5e');
+  $('greet').innerHTML = [...greeting].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('');
+  $('sky').innerHTML = Array.from({ length: 45 }, () => {
+    const s = 1 + Math.random() * 2.5;
+    return `<i class="star" style="left:${Math.random() * 100}%;top:${Math.random() * 100}%;width:${s}px;height:${s}px;--o:${0.4 + Math.random() * 0.6};--d:${1.5 + Math.random() * 2}s;--t:${Math.random() * 1.2}s"></i>`;
+  }).join('');
+  const colors = ['#ffd27a', '#7fd9b6', '#ffffff', '#5fb7ff'];
+  $('sparks').innerHTML = Array.from({ length: 18 }, (_, i) => {
+    const a = (i / 18) * Math.PI * 2, r = 90 + Math.random() * 90;
+    return `<i class="spark" style="--x:${Math.cos(a) * r}px;--y:${Math.sin(a) * r}px;--c:${colors[i % 4]}"></i>`;
+  }).join('');
   const hide = () => {
     splash.classList.add('out');
-    setTimeout(() => splash.remove(), 700);
+    setTimeout(() => splash.remove(), 800);
   };
   splash.onclick = hide;
-  setTimeout(hide, 2400);
+  setTimeout(hide, 4300);
+})();
+
+/* ---------- Push reminder (Android only) ---------- */
+
+(() => {
+  const Push = window.Capacitor?.Plugins?.PushNotifications;
+  if (!Push || window.Capacitor.getPlatform() !== 'android') return; // no plugin in a plain browser
+  $('remind').hidden = false;
+
+  const KEY = 'reminder';
+  const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+  const state = { on: !!saved.on, time: saved.time || '21:00', token: saved.token || '' };
+  const persist = () => localStorage.setItem(KEY, JSON.stringify(state));
+  const paint = () => {
+    $('remindOn').setAttribute('aria-checked', state.on);
+    $('remindTime').value = state.time;
+    $('remindTime').disabled = !state.on;
+  };
+  const sync = () =>
+    state.token &&
+    api('/api/push', { method: 'PUT', body: { token: state.token, enabled: state.on, time: state.time, tzOffset: new Date().getTimezoneOffset() } }).catch((e) => {
+      console.error(e);
+      showError("Couldn't save the reminder — server not reachable.");
+    });
+
+  Push.addListener('registration', (t) => {
+    state.token = t.value;
+    persist();
+    sync();
+  });
+  Push.addListener('registrationError', (e) => {
+    console.error(e);
+    state.on = false;
+    persist();
+    paint();
+    showError("Couldn't set up push — is google-services.json in the app?");
+  });
+
+  async function enable() {
+    let perm = await Push.checkPermissions();
+    if (perm.receive !== 'granted') perm = await Push.requestPermissions();
+    if (perm.receive !== 'granted') {
+      showError('Allow notifications for Habits in Android settings.');
+      return false;
+    }
+    await Push.register(); // fires 'registration' with the FCM token, which syncs to the server
+    return true;
+  }
+
+  $('remindOn').onclick = async () => {
+    const next = !state.on;
+    if (next && !(await enable())) return;
+    state.on = next;
+    persist();
+    paint();
+    sync();
+  };
+  $('remindTime').onchange = (e) => {
+    state.time = e.target.value || '21:00';
+    persist();
+    sync();
+  };
+
+  paint();
+  if (state.on) Push.register(); // refresh token on launch in case it rotated
 })();

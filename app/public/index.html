@@ -3,24 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f6f4ef">
+  <meta name="theme-color" content="#041330">
   <meta name="color-scheme" content="light">
   <title>Habits</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="splash" id="splash" aria-hidden="true">
+    <div class="sky" id="sky"></div>
     <div class="splash-in">
-      <svg class="splash-mark" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20"/><path d="M15 25l6 6 12-14"/></svg>
-      <h2 id="greet">Good morning</h2>
-      <p>Track your habits</p>
+      <div class="logo-wrap">
+        <div class="comet"></div>
+        <div class="shock"></div><div class="shock s2"></div>
+        <div class="sparks" id="sparks"></div>
+        <img class="logo" src="logo.png" alt="">
+      </div>
+      <h2 id="greet" class="greet">Good morning</h2>
+      <p class="tag">Track your habits</p>
     </div>
   </div>
 
   <main class="app">
     <header class="top">
       <div>
-        <p class="eyebrow" id="range"></p>
         <h1 id="title">Today</h1>
       </div>
       <div class="weeknav" id="weeknav">
@@ -56,16 +61,25 @@
         <input id="name" placeholder="New habit" maxlength="60" autocomplete="off" aria-label="Habit name">
         <button type="submit">Add</button>
       </form>
+      <section class="remind card" id="remind" hidden>
+        <div><b>Daily reminder</b><small id="remindSub">Push notification to check your habits</small></div>
+        <input type="time" id="remindTime" value="21:00" aria-label="Reminder time">
+        <button type="button" class="switch" id="remindOn" role="switch" aria-checked="false" aria-label="Reminder on"><i></i></button>
+      </section>
       <section class="list card" id="manage" aria-label="Manage habits"></section>
       <button id="server" class="server" hidden>⚙︎ Server</button>
     </div>
 
     <!-- Diet: chat with Gemini about calories and protein -->
     <div class="tab" id="tab-diet" hidden>
-      <section class="chat card" id="chat" aria-live="polite"></section>
-      <form class="add card" id="dietForm">
+      <div class="chat-bar">
+        <div class="coach"><img src="logo.png" alt=""><div><b>Diet coach</b><small>Calories &amp; protein</small></div></div>
+        <button type="button" id="dietClear" class="clear" aria-label="Clear chat" title="Clear chat"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
+      </div>
+      <section class="chat" id="chat" aria-live="polite"></section>
+      <form class="composer" id="dietForm">
         <input id="dietText" placeholder="What did you eat?" maxlength="2000" autocomplete="off" aria-label="Message">
-        <button type="submit" id="dietSend">Send</button>
+        <button type="submit" id="dietSend" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
       </form>
     </div>
 

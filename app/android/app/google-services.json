@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "754453587313",
+    "project_id": "habit-tracker-app-72fab",
+    "storage_bucket": "habit-tracker-app-72fab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:754453587313:android:f16c6f142d9d2d318002d0",
+        "android_client_info": {
+          "package_name": "com.deepak.habittracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5H39XkJDT1XaazSytX2PBwfM13EfEeZA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
