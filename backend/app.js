@@ -6,6 +6,9 @@ const Habit = require('./models/Habit');
 const Log = require('./models/Log');
 const DietMessage = require('./models/DietMessage');
 const PushDevice = require('./models/PushDevice');
+const GymPlan = require('./models/GymPlan');
+const GymLog = require('./models/GymLog');
+const { MUSCLES } = GymPlan;
 const { messaging } = require('./push');
 const { connect } = require('./db');
 
@@ -110,6 +113,88 @@ app.put(
     if (done) await Log.updateOne({ habit, date }, { habit, date }, { upsert: true });
     else await Log.deleteOne({ habit, date });
     res.json({ habit, date, done: !!done });
+  })
+);
+
+// ---- Gym plan and progress ----
+
+const inRange = (n, min, max) => Number.isInteger(n) && n >= min && n <= max;
+
+app.get(
+  '/api/gym/plan',
+  wrap(async (req, res) => {
+    const plans = await GymPlan.find().sort({ day: 1 });
+    res.json(plans.map((p) => ({ day: p.day, muscles: p.muscles })));
+  })
+);
+
+// Set the workout for a weekday: { muscles: [{ muscle, exercises: [{ name, sets, reps }] }] }, one or two muscles.
+app.put(
+  '/api/gym/plan/:day',
+  wrap(async (req, res) => {
+    const day = Number(req.params.day);
+    const input = Array.isArray(req.body.muscles) ? req.body.muscles : [];
+    const muscles = input.map((m) => ({
+      muscle: m.muscle,
+      exercises: (Array.isArray(m.exercises) ? m.exercises : []).map((e) => ({
+        name: String(e.name || '').trim(),
+        sets: e.sets,
+        reps: e.reps,
+      })),
+    }));
+    const validExercises = (list) =>
+      list.length >= 1 &&
+      list.length <= 10 &&
+      new Set(list.map((e) => e.name.toLowerCase())).size === list.length &&
+      list.every((e) => e.name && e.name.length <= 40 && inRange(e.sets, 1, 20) && inRange(e.reps, 1, 100));
+    const valid =
+      inRange(day, 0, 6) &&
+      muscles.length >= 1 &&
+      muscles.length <= 2 &&
+      new Set(muscles.map((m) => m.muscle)).size === muscles.length &&
+      muscles.every((m) => MUSCLES.includes(m.muscle) && validExercises(m.exercises));
+    if (!valid) return res.status(400).json({ error: 'invalid workout' });
+    await GymPlan.updateOne({ day }, { day, muscles }, { upsert: true });
+    res.json({ day, muscles });
+  })
+);
+
+app.delete(
+  '/api/gym/plan/:day',
+  wrap(async (req, res) => {
+    const day = Number(req.params.day);
+    if (!inRange(day, 0, 6)) return res.status(400).json({ error: 'invalid day' });
+    await GymPlan.deleteOne({ day });
+    res.status(204).end();
+  })
+);
+
+// Gym logs for a date range (inclusive): /api/gym/logs?from=YYYY-MM-DD&to=YYYY-MM-DD
+app.get(
+  '/api/gym/logs',
+  wrap(async (req, res) => {
+    const { from, to } = req.query;
+    if (!DATE_RE.test(from) || !DATE_RE.test(to)) {
+      return res.status(400).json({ error: 'from and to must be YYYY-MM-DD' });
+    }
+    const logs = await GymLog.find({ date: { $gte: from, $lte: to } });
+    res.json(logs.map((l) => ({ date: l.date, muscle: l.muscle, exercise: l.exercise, set: l.set, reps: l.reps })));
+  })
+);
+
+// Record reps done for one set: { date, muscle, exercise, set, reps }. reps 0 clears the set.
+app.put(
+  '/api/gym/logs',
+  wrap(async (req, res) => {
+    const { date, muscle, exercise, set, reps } = req.body;
+    const named = typeof exercise === 'string' && exercise.trim() && exercise.length <= 40;
+    if (!DATE_RE.test(date) || !MUSCLES.includes(muscle) || !named || !inRange(set, 0, 19) || !inRange(reps, 0, 100)) {
+      return res.status(400).json({ error: 'invalid set' });
+    }
+    if (!isEditableDay(date)) return res.status(403).json({ error: 'only today can be changed' });
+    if (reps) await GymLog.updateOne({ date, muscle, exercise, set }, { date, muscle, exercise, set, reps }, { upsert: true });
+    else await GymLog.deleteOne({ date, muscle, exercise, set });
+    res.json({ date, muscle, exercise, set, reps });
   })
 );
 

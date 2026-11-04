@@ -89,6 +89,32 @@
       </form>
     </div>
 
+    <!-- Gym: day-wise workout plan -->
+    <div class="tab" id="tab-gym" hidden>
+      <section class="card gym-empty" id="gymEmpty">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>
+        <h2>Welcome to your gym planner</h2>
+        <p>You can add your schedule in this tab and we will get into it.</p>
+        <button type="button" class="gym-btn" id="gymFirst">Add workout</button>
+      </section>
+
+      <section class="hero card" id="gymHero" hidden>
+        <div class="hero-row">
+          <div>
+            <p class="label">This week</p>
+            <p class="sub" id="gymHeroSub"></p>
+          </div>
+          <p class="big"><span id="gymHeroPct">0</span><small>%</small></p>
+        </div>
+        <div class="bar"><i id="gymHeroBar"></i></div>
+      </section>
+
+      <nav class="strip" id="gymStrip" aria-label="Pick a day" hidden></nav>
+      <section class="card gym-day" id="gymDay" hidden></section>
+
+      <form class="card gym-form" id="gymForm" hidden></form>
+    </div>
+
     <!-- Overall: weekly and daily progress -->
     <div class="tab" id="tab-overall" hidden>
       <div class="seg" role="tablist">
@@ -132,6 +158,10 @@
     <button data-tab="diet">
       <svg viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>
       <span>Diet</span>
+    </button>
+    <button data-tab="gym">
+      <svg viewBox="0 0 24 24"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>
+      <span>Gym</span>
     </button>
     <button data-tab="overall">
       <svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>

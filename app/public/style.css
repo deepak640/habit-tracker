@@ -93,6 +93,10 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .dots i.sel { box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--ink); }
 .row .count { font-size: 14px; font-weight: 600; color: var(--c); font-variant-numeric: tabular-nums; }
 .empty { text-align: center; color: var(--muted); padding: 20px 0; }
+.gym-empty { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 36px 24px; }
+.gym-empty svg { width: 44px; height: 44px; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.gym-empty h2 { margin: 6px 0 0; font-size: 17px; }
+.gym-empty p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
 
 /* Tabs */
 .tab { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; flex: 1; min-height: 0; align-content: start; padding: 8px 10px; margin: -8px -10px; overflow-y: auto; overscroll-behavior: none; -webkit-overflow-scrolling: touch; overflow-x: hidden; }
@@ -271,3 +275,51 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .switch i { display: block; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.2s var(--ease); }
 .switch[aria-checked="true"] { background: #34c759; }
 .switch[aria-checked="true"] i { transform: translateX(20px); }
+
+/* Gym */
+.gym-btn { margin-top: 10px; padding: 11px 22px; border-radius: 14px; background: var(--ink); color: #fff; font-weight: 600; }
+.gym-btn:active { transform: scale(0.97); }
+.gym-btn.ghost { background: var(--track); color: var(--ink); margin-top: 0; }
+.gym-btn.danger { background: #fdecea; color: #c0392b; margin-top: 0; }
+#gymHero[hidden], #gymStrip[hidden], #gymDay[hidden], #gymForm[hidden], #gymEmpty[hidden] { display: none; }
+.gym-day, .gym-form { padding: 18px 18px 20px; display: grid; gap: 14px; }
+.gym-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gym-head h2 { font-size: 20px; font-weight: 700; }
+.gym-head .sub { margin-top: 1px; }
+.gym-edit { padding: 7px 14px; border-radius: 11px; background: var(--track); font-size: 13px; font-weight: 600; }
+.gym-muscle { display: grid; gap: 10px; }
+.gym-muscle h3 { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
+.gym-ex { display: grid; gap: 2px; padding: 10px 14px 6px; border-radius: 16px; background: rgba(31, 36, 48, 0.035); }
+.gym-ex h4 { font-size: 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.gym-ex h4 span { min-width: 0; overflow-wrap: anywhere; }
+.gym-ex h4 small { flex: none; font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.gset { --c: #16a37a; display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.gset:first-of-type { border-top: 0; }
+.gset .tick { cursor: pointer; }
+.gset.done .tick { background: var(--c); }
+.gset.done .tick svg { opacity: 1; }
+.gset .nm { flex: 1; font-weight: 500; }
+.gset.done .nm { color: var(--muted); }
+.gset input { width: 58px; padding: 7px 8px; text-align: center; font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; border: 0; border-radius: 10px; outline: 0; background: var(--track); color: inherit; }
+.gset .of { font-size: 13px; color: var(--muted); min-width: 44px; font-variant-numeric: tabular-nums; }
+.gset button.tick:disabled, .gset input:disabled { opacity: 0.55; cursor: default; }
+.gym-rest { text-align: center; color: var(--muted); padding: 10px 0; }
+.gym-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.gym-form select, .gym-form input[type=number] {
+  font: inherit; font-weight: 600; color: var(--ink); border: 0; border-radius: 12px; outline: 0; padding: 11px 14px;
+  background: var(--track); width: 100%; appearance: none; -webkit-appearance: none;
+}
+.gym-form select { text-transform: capitalize; padding-right: 34px; background: var(--track) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%238a8f9c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center; }
+.gym-form .acts { display: flex; gap: 8px; }
+.gym-form .acts .gym-btn { flex: 1; margin-top: 0; }
+.gym-form .acts .gym-btn.ghost, .gym-form .acts .gym-btn.danger { flex: none; }
+.day i.gp { font-style: normal; }
+.gym-fm { display: grid; gap: 8px; padding: 14px; border-radius: 16px; background: rgba(31, 36, 48, 0.035); }
+.gym-form .xhead, .gym-form .xrow { display: grid; grid-template-columns: minmax(0, 1fr) 58px 58px 30px; gap: 6px; align-items: center; }
+.gym-form .xhead { font-size: 11px; font-weight: 600; color: var(--muted); padding: 2px 2px 0; }
+.gym-form .xrow input { width: 100%; min-width: 0; font: inherit; font-weight: 600; color: var(--ink); border: 0; border-radius: 12px; outline: 0; padding: 11px 10px; background: var(--card); }
+.gym-form .xrow input[type=number] { text-align: center; padding-left: 4px; padding-right: 4px; font-variant-numeric: tabular-nums; }
+.gym-form .xrm { width: 30px; height: 30px; border-radius: 50%; font-size: 18px; line-height: 1; color: var(--muted); background: var(--track); }
+.gym-form .xrm:disabled { opacity: 0.3; cursor: default; }
+.gym-form .add-ex { justify-self: start; padding: 8px 14px; font-size: 13px; }
+.gym-form .add-ex[hidden] { display: none; }

@@ -15,7 +15,7 @@ const HISTORY_WEEKS = 8;
 
 let weekStart = mondayOf(new Date());
 let selected = iso(new Date());
-const TABS = ['dashboard', 'control', 'diet', 'overall'];
+const TABS = ['dashboard', 'control', 'diet', 'gym', 'overall'];
 let tab = 'dashboard';
 let view = 'weekly';
 let habits = [];
@@ -76,6 +76,7 @@ async function load() {
   showError(null);
   habits = h;
   done = new Set(logs.map((l) => `${l.habit}|${l.date}`));
+  await loadGym();
   render();
 }
 
@@ -122,9 +123,9 @@ function render() {
   for (const t of TABS) $('tab-' + t).hidden = t !== tab;
   document.querySelectorAll('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
   positionGlide();
-  $('weeknav').hidden = tab === 'control' || tab === 'diet';
+  $('weeknav').hidden = tab === 'control' || tab === 'diet' || tab === 'gym';
   $('title').textContent =
-    tab === 'control' ? 'Control' : tab === 'diet' ? 'Diet' : tab === 'overall' ? 'Overall' : selected === todayIso ? 'Today' : fmt(new Date(selected + 'T00:00'), { weekday: 'long' });
+    tab === 'control' ? 'Control' : tab === 'diet' ? 'Diet' : tab === 'gym' ? 'Gym' : tab === 'overall' ? 'Overall' : selected === todayIso ? 'Today' : fmt(new Date(selected + 'T00:00'), { weekday: 'long' });
 
   if (tab === 'dashboard') {
     renderStrip(dates, todayIso);
@@ -132,6 +133,8 @@ function render() {
     renderList(todayIso);
   } else if (tab === 'control') {
     renderControl();
+  } else if (tab === 'gym') {
+    renderGym();
   } else if (tab === 'diet') {
     loadDiet();
   } else {
@@ -423,6 +426,281 @@ function renderOverall(dates, todayIso) {
   }
   if (!habits.length) detail.append(Object.assign(el('div', 'empty'), { textContent: 'No habits yet. Add one in the Control tab.' }));
 }
+
+/* ---------- Gym ---------- */
+
+const MUSCLES = ['chest', 'biceps', 'triceps', 'back', 'shoulders', 'legs', 'arms'];
+const FULL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MAX_EXERCISES = 10;
+const todayIdx = () => (new Date().getDay() + 6) % 7; // Monday = 0
+
+let gymPlan = {}; // weekday index -> [{ muscle, exercises: [{ name, sets, reps }] }]
+let gymLogs = new Map(); // "date|muscle|exercise|set" -> reps done
+let gymDay = todayIdx(); // weekday shown
+let gymEditing = null; // null, or the form's working copy { day, muscles }
+
+const gymWeek = () => weekDates(mondayOf(new Date())).map(iso);
+const gymKey = (date, muscle, exercise, set) => `${date}|${muscle}|${exercise}|${set}`;
+const newExercise = () => ({ name: '', sets: 3, reps: 10 });
+
+// Planned and done reps for one weekday; done is capped per set so extra reps cannot push past 100%.
+function gymDayStats(idx) {
+  const date = gymWeek()[idx];
+  let planned = 0, got = 0;
+  for (const m of gymPlan[idx] || []) {
+    for (const e of m.exercises) {
+      for (let s = 0; s < e.sets; s++) {
+        planned += e.reps;
+        got += Math.min(gymLogs.get(gymKey(date, m.muscle, e.name, s)) || 0, e.reps);
+      }
+    }
+  }
+  return { planned, got, pct: planned ? Math.round((got / planned) * 100) : 0 };
+}
+
+async function loadGym() {
+  const week = gymWeek();
+  try {
+    const [plans, logs] = await Promise.all([api('/api/gym/plan'), api(`/api/gym/logs?from=${week[0]}&to=${week[6]}`)]);
+    gymPlan = Object.fromEntries(plans.map((p) => [p.day, p.muscles]));
+    gymLogs = new Map(logs.map((l) => [gymKey(l.date, l.muscle, l.exercise, l.set), l.reps]));
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderGym() {
+  const planned = Object.keys(gymPlan).length > 0;
+  $('gymEmpty').hidden = planned || !!gymEditing;
+  $('gymForm').hidden = !gymEditing;
+  for (const id of ['gymHero', 'gymStrip', 'gymDay']) $(id).hidden = !planned || !!gymEditing;
+  if (gymEditing) return renderGymForm();
+  if (!planned) return;
+
+  const stats = DAYS.map((_, i) => gymDayStats(i));
+  const planned_ = stats.reduce((n, x) => n + x.planned, 0);
+  const got = stats.reduce((n, x) => n + x.got, 0);
+  const pct = planned_ ? Math.round((got / planned_) * 100) : 0;
+  $('gymHeroPct').textContent = pct;
+  $('gymHeroBar').style.width = pct + '%';
+  $('gymHeroSub').textContent = `${got} of ${planned_} reps done`;
+
+  const week = gymWeek();
+  const todayI = todayIdx();
+  const strip = $('gymStrip');
+  strip.innerHTML = '';
+  DAYS.forEach((name, i) => {
+    const b = el('button', ['day', i === gymDay && 'sel', i === todayI && 'today', i > todayI && 'future'].filter(Boolean).join(' '));
+    const label = !gymPlan[i] ? '–' : i > todayI ? '' : stats[i].pct + '%';
+    b.innerHTML = `<small>${name}</small><b>${new Date(week[i] + 'T00:00').getDate()}</b><i>${label}</i>`;
+    b.onclick = () => {
+      gymDay = i;
+      renderGym();
+    };
+    strip.append(b);
+  });
+  renderGymDay(week[gymDay], stats[gymDay]);
+}
+
+function renderGymDay(date, st) {
+  const box = $('gymDay');
+  box.innerHTML = '';
+  const muscles = gymPlan[gymDay];
+  const head = el('div', 'gym-head');
+  head.innerHTML = `<div><h2>${FULL_DAYS[gymDay]}</h2><p class="sub"></p></div><button type="button" class="gym-edit">${muscles ? 'Edit' : 'Add'}</button>`;
+  head.querySelector('.sub').textContent = muscles
+    ? `${muscles.map((m) => m.muscle).join(' + ')} · ${st.pct}% done${date < iso(new Date()) ? ' · locked' : ''}`
+    : 'Rest day';
+  head.querySelector('.gym-edit').onclick = () => openGymForm(gymDay);
+  box.append(head);
+  if (!muscles) return;
+
+  const editable = date === iso(new Date()); // only today can be ticked, like habits
+  for (const m of muscles) {
+    const block = el('div', 'gym-muscle');
+    const title = el('h3');
+    title.textContent = m.muscle;
+    block.append(title);
+    for (const e of m.exercises) {
+      const ex = el('div', 'gym-ex');
+      const sets = [];
+      let doneSets = 0;
+      for (let s = 0; s < e.sets; s++) {
+        const reps = gymLogs.get(gymKey(date, m.muscle, e.name, s)) || 0;
+        if (reps) doneSets++;
+        const row = el('div', 'gset' + (reps ? ' done' : ''));
+        row.innerHTML = `<button type="button" class="tick" aria-label="Set ${s + 1} done">${TICK}</button><span class="nm">Set ${s + 1}</span><input type="number" inputmode="numeric" min="0" max="100" aria-label="Reps done"><span class="of">/ ${e.reps}</span>`;
+        const tick = row.querySelector('button');
+        const input = row.querySelector('input');
+        input.value = reps || '';
+        input.placeholder = '0';
+        tick.disabled = input.disabled = !editable;
+        tick.onclick = () => saveGymSet(date, m.muscle, e.name, s, reps ? 0 : e.reps);
+        input.onchange = () => saveGymSet(date, m.muscle, e.name, s, Math.max(0, Math.min(100, Math.round(Number(input.value)) || 0)));
+        sets.push(row);
+      }
+      ex.innerHTML = '<h4><span></span><small></small></h4>';
+      ex.querySelector('span').textContent = e.name;
+      ex.querySelector('small').textContent = `${doneSets}/${e.sets} sets · ${e.reps} reps`;
+      ex.append(...sets);
+      block.append(ex);
+    }
+    box.append(block);
+  }
+}
+
+async function saveGymSet(date, muscle, exercise, set, reps) {
+  if (date !== iso(new Date())) return;
+  const key = gymKey(date, muscle, exercise, set);
+  reps ? gymLogs.set(key, reps) : gymLogs.delete(key);
+  renderGym();
+  try {
+    await api('/api/gym/logs', { method: 'PUT', body: { date, muscle, exercise, set, reps } });
+  } catch (e) {
+    console.error(e);
+    await loadGym(); // resync with the server if the save failed
+    renderGym();
+  }
+}
+
+function openGymForm(day) {
+  const cur = gymPlan[day];
+  gymEditing = {
+    day,
+    muscles: cur
+      ? cur.map((m) => ({ muscle: m.muscle, exercises: m.exercises.map((e) => ({ ...e })) }))
+      : [{ muscle: 'chest', exercises: [newExercise()] }],
+  };
+  renderGym();
+}
+
+function renderGymForm() {
+  const f = $('gymForm');
+  const w = gymEditing;
+  const num = (v, max) => Math.min(max, Math.max(1, Math.round(Number(v)) || 1));
+  f.innerHTML = '';
+
+  const day = el('label');
+  day.innerHTML = `Day<select>${FULL_DAYS.map((n, i) => `<option value="${i}"${i === w.day ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
+  day.querySelector('select').onchange = (e) => {
+    const d = Number(e.target.value);
+    const cur = gymPlan[d];
+    w.day = d;
+    if (cur) w.muscles = cur.map((m) => ({ muscle: m.muscle, exercises: m.exercises.map((x) => ({ ...x })) }));
+    renderGymForm();
+  };
+
+  const seg = el('div', 'seg');
+  seg.innerHTML = `<button type="button" class="${w.muscles.length === 1 ? 'on' : ''}">1 muscle</button><button type="button" class="${w.muscles.length === 2 ? 'on' : ''}">2 muscles</button>`;
+  seg.children[0].onclick = () => {
+    w.muscles = w.muscles.slice(0, 1);
+    renderGymForm();
+  };
+  seg.children[1].onclick = () => {
+    if (w.muscles.length < 2) w.muscles.push({ muscle: MUSCLES.find((m) => m !== w.muscles[0].muscle), exercises: [newExercise()] });
+    renderGymForm();
+  };
+  f.append(day, seg);
+
+  w.muscles.forEach((m, i) => {
+    const taken = w.muscles.filter((_, j) => j !== i).map((x) => x.muscle);
+    const block = el('div', 'gym-fm');
+    block.innerHTML = `<label>Muscle<select>${MUSCLES.map((n) => `<option value="${n}"${n === m.muscle ? ' selected' : ''}${taken.includes(n) ? ' disabled' : ''}>${n}</option>`).join('')}</select></label>
+      <div class="xhead"><span>Exercise</span><span>Sets</span><span>Reps</span><span></span></div>`;
+    block.querySelector('select').onchange = (e) => (m.muscle = e.target.value);
+    m.exercises.forEach((x, j) => {
+      const row = el('div', 'xrow');
+      row.innerHTML = `<input type="text" maxlength="40" placeholder="e.g. Bench press" autocomplete="off" aria-label="Exercise name">
+        <input type="number" inputmode="numeric" min="1" max="20" aria-label="Sets">
+        <input type="number" inputmode="numeric" min="1" max="100" aria-label="Reps">
+        <button type="button" class="xrm" aria-label="Remove exercise">×</button>`;
+      const [name, sets, reps] = row.querySelectorAll('input');
+      name.value = x.name;
+      sets.value = x.sets;
+      reps.value = x.reps;
+      name.oninput = () => (x.name = name.value);
+      sets.onchange = () => (x.sets = num(sets.value, 20));
+      reps.onchange = () => (x.reps = num(reps.value, 100));
+      const rm = row.querySelector('.xrm');
+      rm.disabled = m.exercises.length === 1;
+      rm.onclick = () => {
+        m.exercises.splice(j, 1);
+        renderGymForm();
+      };
+      block.append(row);
+    });
+    const add = el('button', 'gym-btn ghost add-ex');
+    add.type = 'button';
+    add.textContent = '+ Add exercise';
+    add.hidden = m.exercises.length >= MAX_EXERCISES;
+    add.onclick = () => {
+      m.exercises.push(newExercise());
+      renderGymForm();
+    };
+    block.append(add);
+    f.append(block);
+  });
+
+  const acts = el('div', 'acts');
+  acts.innerHTML = '<button type="submit" class="gym-btn">Save</button><button type="button" class="gym-btn ghost">Cancel</button>';
+  if (gymPlan[w.day]) {
+    const del = el('button', 'gym-btn danger');
+    del.type = 'button';
+    del.textContent = 'Remove';
+    del.onclick = removeGymDay;
+    acts.append(del);
+  }
+  acts.querySelector('.ghost').onclick = () => {
+    gymEditing = null;
+    renderGym();
+  };
+  f.append(acts);
+}
+
+$('gymForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const w = gymEditing;
+  const muscles = w.muscles.map((m) => ({ muscle: m.muscle, exercises: m.exercises.map((x) => ({ ...x, name: x.name.trim() })) }));
+  const names = (m) => m.exercises.map((x) => x.name.toLowerCase());
+  const problem = muscles.find((m) => m.exercises.some((x) => !x.name))
+    ? 'Give every exercise a name.'
+    : muscles.find((m) => new Set(names(m)).size !== m.exercises.length)
+      ? 'Each exercise name must be different within a muscle.'
+      : '';
+  if (problem) return showError(problem);
+  const btn = $('gymForm').querySelector('[type=submit]');
+  btn.disabled = true;
+  try {
+    await api(`/api/gym/plan/${w.day}`, { method: 'PUT', body: { muscles } });
+    gymPlan[w.day] = muscles;
+    gymDay = w.day;
+    gymEditing = null;
+  } catch (err) {
+    console.error(err);
+    showError("Couldn't save the workout — server not reachable.");
+    btn.disabled = false;
+    return;
+  }
+  showError(null);
+  renderGym();
+};
+
+async function removeGymDay() {
+  const d = gymEditing.day;
+  if (!confirm(`Remove the ${FULL_DAYS[d]} workout?`)) return;
+  try {
+    await api(`/api/gym/plan/${d}`, { method: 'DELETE' });
+    delete gymPlan[d];
+    gymEditing = null;
+  } catch (err) {
+    console.error(err);
+    showError("Couldn't remove the workout — server not reachable.");
+    return;
+  }
+  renderGym();
+}
+
+$('gymFirst').onclick = () => openGymForm(gymDay);
 
 /* ---------- Wiring ---------- */
 
