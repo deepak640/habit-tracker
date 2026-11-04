@@ -219,7 +219,7 @@ app.get(
     if (!fcm) return res.status(503).json({ error: 'FIREBASE_SERVICE_ACCOUNT is not set' });
 
     const now = Date.now();
-    const habitCount = await Habit.countDocuments();
+    const habits = await Habit.find().sort({ order: 1, createdAt: 1 }).lean();
     let sent = 0;
     for (const d of await PushDevice.find({ enabled: true })) {
       const local = new Date(now - d.tzOffset * 60000).toISOString(); // shifted clock, read as UTC
@@ -228,10 +228,10 @@ app.get(
       if (hour < 8 || hour >= 22) continue; // quiet hours
       if (d.lastSentAt && now - d.lastSentAt.getTime() < d.everyHours * 3600000 - 300000) continue; // 5 min slack so cron jitter doesn't skip a slot
 
-      const done = await Log.countDocuments({ date: day });
-      const left = Math.max(habitCount - done, 0);
-      if (habitCount && !left) continue; // nothing to nag about
-      const notification = { title: 'Keep it up 💪', body: `You have only ${left} habit${left === 1 ? '' : 's'} left today.` };
+      const done = new Set((await Log.distinct('habit', { date: day })).map(String));
+      const left = habits.filter((h) => !done.has(String(h._id)));
+      if (!left.length) continue; // nothing pending, no notification
+      const notification = { title: 'Keep it up 💪', body: `Tasks you have left: ${left.map((h) => h.name).join(', ')}` };
       try {
         await fcm.send({ token: d.token, notification, android: { priority: 'high' } });
         d.lastSentAt = new Date(now);
