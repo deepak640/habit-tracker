@@ -289,19 +289,20 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .gym-edit { padding: 7px 14px; border-radius: 11px; background: var(--track); font-size: 13px; font-weight: 600; }
 .gym-muscle { display: grid; gap: 10px; }
 .gym-muscle h3 { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
-.gym-ex { display: grid; gap: 2px; padding: 10px 14px 6px; border-radius: 16px; background: rgba(31, 36, 48, 0.035); }
+.gym-ex { display: grid; gap: 2px; padding: 10px 12px 4px; border-radius: 16px; background: rgba(31, 36, 48, 0.035); }
 .gym-ex h4 { font-size: 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .gym-ex h4 span { min-width: 0; overflow-wrap: anywhere; }
 .gym-ex h4 small { flex: none; font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
-.gset { --c: #16a37a; display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
-.gset:first-of-type { border-top: 0; }
-.gset .tick { cursor: pointer; }
+.gsets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; padding: 6px 0 8px; }
+.gset { --c: #16a37a; display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 14px; background: var(--card); }
+.gset .tick { width: 28px; height: 28px; position: relative; cursor: pointer; }
+.gset .tick b { font-size: 12px; font-weight: 700; color: var(--c); }
+.gset .tick svg { position: absolute; inset: 0; margin: auto; }
 .gset.done .tick { background: var(--c); }
+.gset.done .tick b { visibility: hidden; }
 .gset.done .tick svg { opacity: 1; }
-.gset .nm { flex: 1; font-weight: 500; }
-.gset.done .nm { color: var(--muted); }
-.gset input { width: 58px; padding: 7px 8px; text-align: center; font: inherit; font-weight: 600; font-variant-numeric: tabular-nums; border: 0; border-radius: 10px; outline: 0; background: var(--track); color: inherit; }
-.gset .of { font-size: 13px; color: var(--muted); min-width: 44px; font-variant-numeric: tabular-nums; }
+.gset input { flex: 1; min-width: 0; width: 100%; padding: 4px 0; text-align: center; font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; border: 0; outline: 0; background: transparent; color: inherit; }
+.gset input::placeholder { color: var(--muted); font-weight: 500; opacity: 1; }
 .gset button.tick:disabled, .gset input:disabled { opacity: 0.55; cursor: default; }
 .gym-rest { text-align: center; color: var(--muted); padding: 10px 0; }
 .gym-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }

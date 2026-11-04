@@ -529,11 +529,11 @@ function renderGymDay(date, st) {
         const reps = gymLogs.get(gymKey(date, m.muscle, e.name, s)) || 0;
         if (reps) doneSets++;
         const row = el('div', 'gset' + (reps ? ' done' : ''));
-        row.innerHTML = `<button type="button" class="tick" aria-label="Set ${s + 1} done">${TICK}</button><span class="nm">Set ${s + 1}</span><input type="number" inputmode="numeric" min="0" max="100" aria-label="Reps done"><span class="of">/ ${e.reps}</span>`;
+        row.innerHTML = `<button type="button" class="tick" aria-label="Set ${s + 1} done"><b>${s + 1}</b>${TICK}</button><input type="number" inputmode="numeric" min="0" max="100" aria-label="Set ${s + 1} reps done">`;
         const tick = row.querySelector('button');
         const input = row.querySelector('input');
         input.value = reps || '';
-        input.placeholder = '0';
+        input.placeholder = e.reps; // planned reps; type a different number to override
         tick.disabled = input.disabled = !editable;
         tick.onclick = () => saveGymSet(date, m.muscle, e.name, s, reps ? 0 : e.reps);
         input.onchange = () => saveGymSet(date, m.muscle, e.name, s, Math.max(0, Math.min(100, Math.round(Number(input.value)) || 0)));
@@ -542,7 +542,9 @@ function renderGymDay(date, st) {
       ex.innerHTML = '<h4><span></span><small></small></h4>';
       ex.querySelector('span').textContent = e.name;
       ex.querySelector('small').textContent = `${doneSets}/${e.sets} sets · ${e.reps} reps`;
-      ex.append(...sets);
+      const grid = el('div', 'gsets');
+      grid.append(...sets);
+      ex.append(grid);
       block.append(ex);
     }
     box.append(block);
