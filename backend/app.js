@@ -226,7 +226,7 @@ app.get(
       const day = local.slice(0, 10);
       const hour = Number(local.slice(11, 13));
       if (hour < 8 || hour >= 22) continue; // quiet hours
-      if (d.lastSentAt && now - d.lastSentAt.getTime() < d.everyHours * 3600000 - 30000) continue;
+      if (d.lastSentAt && now - d.lastSentAt.getTime() < d.everyHours * 3600000 - 300000) continue; // 5 min slack so cron jitter doesn't skip a slot
 
       const done = await Log.countDocuments({ date: day });
       const left = Math.max(habitCount - done, 0);
