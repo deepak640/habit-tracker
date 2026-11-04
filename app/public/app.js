@@ -76,7 +76,7 @@ async function load() {
   showError(null);
   habits = h;
   done = new Set(logs.map((l) => `${l.habit}|${l.date}`));
-  await loadGym();
+  await loadGym(from, dates[6]);
   render();
 }
 
@@ -335,13 +335,13 @@ $('dietClear').onclick = async () => {
 
 /* ---------- Overall ---------- */
 
-function bars(items, compact) {
-  const chart = $('chart');
+function bars(items, compact, id = 'chart') {
+  const chart = $(id);
   chart.className = 'chart' + (compact ? ' compact' : '');
   chart.innerHTML = '';
   items.forEach((it) => {
     const col = el('div', 'col' + (it.sel ? ' sel' : ''));
-    col.innerHTML = `<div class="t"><i style="height:${it.pct}%"></i></div><small>${it.label}</small><em>${it.pct}%</em>`;
+    col.innerHTML = `<div class="t"><i style="height:${it.pct}%"></i></div><small>${it.label}</small><em>${it.note ?? it.pct + '%'}</em>`;
     chart.append(col);
   });
 }
@@ -425,6 +425,7 @@ function renderOverall(dates, todayIso) {
     }
   }
   if (!habits.length) detail.append(Object.assign(el('div', 'empty'), { textContent: 'No habits yet. Add one in the Control tab.' }));
+  renderGymReport(dates, todayIso);
 }
 
 /* ---------- Gym ---------- */
@@ -443,29 +444,131 @@ const gymWeek = () => weekDates(mondayOf(new Date())).map(iso);
 const gymKey = (date, muscle, exercise, set) => `${date}|${muscle}|${exercise}|${set}`;
 const newExercise = () => ({ name: '', sets: 3, reps: 10 });
 
-// Planned and done reps for one weekday; done is capped per set so extra reps cannot push past 100%.
-function gymDayStats(idx) {
-  const date = gymWeek()[idx];
-  let planned = 0, got = 0;
+// Planned and done reps for one date, from that weekday's plan. Done is capped per set so
+// extra reps cannot push past 100%. muscles breaks the totals down per muscle.
+function gymStats(date) {
+  const idx = (new Date(date + 'T00:00').getDay() + 6) % 7;
+  const out = { planned: 0, got: 0, pct: 0, muscles: {} };
   for (const m of gymPlan[idx] || []) {
+    let planned = 0, got = 0;
     for (const e of m.exercises) {
       for (let s = 0; s < e.sets; s++) {
         planned += e.reps;
         got += Math.min(gymLogs.get(gymKey(date, m.muscle, e.name, s)) || 0, e.reps);
       }
     }
+    out.muscles[m.muscle] = { planned, got };
+    out.planned += planned;
+    out.got += got;
   }
-  return { planned, got, pct: planned ? Math.round((got / planned) * 100) : 0 };
+  out.pct = out.planned ? Math.round((out.got / out.planned) * 100) : 0;
+  return out;
 }
 
-async function loadGym() {
+const gymDayStats = (idx) => gymStats(gymWeek()[idx]);
+
+// Percent of a full week's planned reps, like the habit week percent.
+function gymWeekPct(start) {
+  const stats = weekDates(start).map((d) => gymStats(iso(d)));
+  const planned = stats.reduce((n, x) => n + x.planned, 0);
+  const got = stats.reduce((n, x) => n + x.got, 0);
+  return planned ? Math.round((got / planned) * 100) : 0;
+}
+
+let gymRange = null; // { from, to } of the logs last loaded
+
+// Loads the plan and logs for from..to (always including the current week, which the Gym tab needs).
+// Called with no range it reloads the last one.
+async function loadGym(from, to) {
   const week = gymWeek();
+  if (from) gymRange = { from: from < week[0] ? from : week[0], to: to > week[6] ? to : week[6] };
+  const r = gymRange || { from: week[0], to: week[6] };
   try {
-    const [plans, logs] = await Promise.all([api('/api/gym/plan'), api(`/api/gym/logs?from=${week[0]}&to=${week[6]}`)]);
+    const [plans, logs] = await Promise.all([api('/api/gym/plan'), api(`/api/gym/logs?from=${r.from}&to=${r.to}`)]);
     gymPlan = Object.fromEntries(plans.map((p) => [p.day, p.muscles]));
     gymLogs = new Map(logs.map((l) => [gymKey(l.date, l.muscle, l.exercise, l.set), l.reps]));
   } catch (e) {
     console.error(e);
+  }
+}
+
+/* ---------- Gym report (Overall tab) ---------- */
+
+function renderGymReport(dates, todayIso) {
+  const box = $('gymReport');
+  const hasPlan = Object.keys(gymPlan).length > 0;
+  const detail = $('gymDetail');
+  detail.innerHTML = '';
+  $('gymReportEmpty').hidden = hasPlan;
+  $('gymChart').hidden = $('gymDetail').hidden = !hasPlan;
+  if (!hasPlan) {
+    $('gymHint').textContent = '';
+    return;
+  }
+  const dateStrs = dates.map(iso);
+  const muscles = MUSCLES.filter((m) => Object.values(gymPlan).some((list) => list.some((x) => x.muscle === m)));
+  const mColor = (m) => color(MUSCLES.indexOf(m))[0];
+
+  if (view === 'weekly') {
+    $('gymHint').textContent = `Each bar is one week of workouts. This week: ${gymWeekPct(weekStart)}% of planned reps.`;
+    bars(
+      Array.from({ length: HISTORY_WEEKS }, (_, k) => {
+        const start = addDays(weekStart, -7 * (HISTORY_WEEKS - 1 - k));
+        return { pct: gymWeekPct(start), label: k === HISTORY_WEEKS - 1 ? 'This\nweek' : fmt(start, { month: 'short' }) + '\n' + start.getDate(), sel: k === HISTORY_WEEKS - 1 };
+      }),
+      false,
+      'gymChart'
+    );
+    $('gymDetailTitle').textContent = 'By muscle this week';
+    const stats = dateStrs.map(gymStats);
+    muscles.forEach((m) => {
+      const planned = stats.reduce((n, x) => n + (x.muscles[m]?.planned || 0), 0);
+      const got = stats.reduce((n, x) => n + (x.muscles[m]?.got || 0), 0);
+      const p = planned ? Math.round((got / planned) * 100) : 0;
+      const row = el('div', 'wrow');
+      row.style.setProperty('--c', mColor(m));
+      row.innerHTML = `<span class="n" style="text-transform:capitalize"></span><span class="b"><i style="width:${p}%"></i></span><span class="p">${p}%</span>`;
+      row.querySelector('.n').textContent = m;
+      detail.append(row);
+    });
+  } else {
+    $('gymHint').textContent = 'Each bar is one day. Rest days show a dash. Dark bar is today.';
+    const end = dateStrs[6] < todayIso ? dates[6] : new Date(todayIso + 'T00:00');
+    bars(
+      Array.from({ length: 14 }, (_, k) => {
+        const d = addDays(end, -(13 - k));
+        const date = iso(d);
+        const st = gymStats(date);
+        return { pct: st.pct, label: d.getDate(), sel: date === todayIso, note: st.planned ? st.pct + '%' : '–' };
+      }),
+      true,
+      'gymChart'
+    );
+    $('gymDetailTitle').textContent = 'This week, day by day';
+    const head = el('div', 'mrow head');
+    head.append(el('span'));
+    DAYS.forEach((d) => head.append(Object.assign(el('span', 'h'), { textContent: d[0] })));
+    head.append(el('span'));
+    detail.append(head);
+    const stats = dateStrs.map(gymStats);
+    muscles.forEach((m) => {
+      const row = el('div', 'mrow');
+      row.style.setProperty('--c', mColor(m));
+      row.append(Object.assign(el('span', 'n'), { textContent: m, style: 'text-transform:capitalize' }));
+      stats.forEach((st) => {
+        const x = st.muscles[m];
+        row.append(el('span', 'dot' + (!x ? ' off' : x.got >= x.planned ? ' on' : x.got ? ' part' : '')));
+      });
+      const planned = stats.reduce((n, x) => n + (x.muscles[m]?.planned || 0), 0);
+      const got = stats.reduce((n, x) => n + (x.muscles[m]?.got || 0), 0);
+      row.append(Object.assign(el('span', 'p'), { textContent: (planned ? Math.round((got / planned) * 100) : 0) + '%' }));
+      detail.append(row);
+    });
+    const foot = el('div', 'mrow foot');
+    foot.append(Object.assign(el('span', 'n'), { textContent: 'Daily' }));
+    stats.forEach((st, i) => foot.append(Object.assign(el('span', 'd'), { textContent: !st.planned || dateStrs[i] > todayIso ? '–' : st.pct + '%' })));
+    foot.append(el('span'));
+    detail.append(foot);
   }
 }
 
